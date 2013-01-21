@@ -28,7 +28,8 @@ from sqlobject.dberrors import IntegrityError
 
 conection = None
 
-class Tweet(SQLObject):
+class SearchTweet(SQLObject):
+    """A tweet as found in the Twitter search API"""
     to_user = UnicodeCol(length=15, default=None)
     to_user_name = UnicodeCol(length=20, default=None)
     to_user_id = IntCol(default=None)
@@ -43,8 +44,30 @@ class Tweet(SQLObject):
 
 
 class Query(SQLObject):
+    """A query for the search API"""
     query = UnicodeCol()
     max_id = IntCol(default = None) # most recent seen
+
+
+class TimelineTweet(SQLObject):
+    """A tweet as found in the timeline"""
+    # FIXME count retweets
+    user_id = IntCol()
+    user_screen_name = UnicodeCol(length=20)
+    created_at = DateTimeCol()
+    text = UnicodeCol(length=140)
+    source = UnicodeCol()
+    in_reply_to_status_id = IntCol(default=None)
+    in_reply_to_user_id = IntCol(default=None)
+    in_reply_to_screen_name = UnicodeCol(length=20, default=None)
+    timeline = ForeignKey('Timeline')
+
+
+class Timeline(SQLObject):
+    """A Twitter timeline for a single user account"""
+    # FIXME: user can change screen name
+    screen_name = UnicodeCol(length=20, alternateID=True)
+    max_id = IntCol(default=None)
 
 
 def twitterdate(tdate):
@@ -70,7 +93,7 @@ def search_sub(twitter_query_results, query):
             'created_at' : created_at, \
             'query' : query }
         try:
-            Tweet(**kwargs)
+            SearchTweet(**kwargs)
         except IntegrityError:
             print 'DEBUG: tweet already in database', tweet['id']
 
@@ -92,7 +115,6 @@ def search(query_str):
     RPP = 200 # results per page
     kwargs = { 'q' : query_str, 'rpp' : RPP }
     while True:
-        print kwargs
         tquery = ts.search(**kwargs)
         search_sub(tquery['results'], query)
         query.max_id = tquery['max_id']
@@ -102,16 +124,64 @@ def search(query_str):
             break
 
 
+def timeline_sub(tl, timeline):
+    for tweet in tl:
+        created_at = twitterdate(tweet['created_at'])
+        kwargs = { 'id' : tweet['id'], \
+            'user_id' : tweet['user']['id'], \
+            'user_screen_name' : tweet['user']['screen_name'], \
+            'in_reply_to_status_id' : tweet['in_reply_to_status_id'], \
+            'in_reply_to_user_id' : tweet['in_reply_to_user_id'], \
+            'in_reply_to_screen_name' : tweet['in_reply_to_screen_name'], \
+            'text' : tweet['text'], \
+            'source' : tweet['source'], \
+            'created_at' : created_at, \
+            'timeline' : timeline }
+        try:
+            TimelineTweet(**kwargs)
+        except IntegrityError:
+            print 'DEBUG: tweet already in database', tweet['id']
+
+
+
+def timeline(screen_name):
+    print '*** SCREEN NAME: %s' % screen_name
+
+    # find the most recent ID
+    results = Timeline.selectBy(screen_name = screen_name)
+    if 0 == results.count():
+        # make a new timeline
+        timeline = Timeline(screen_name = screen_name)
+    else:
+        # use the existing timeline
+        timeline = results[0]
+
+    # prepare to search
+    t = twitter.Twitter(auth=twitter.NoAuth(), api_version='1', domain='api.twitter.com')
+    kwargs = { 'screen_name' : screen_name }
+    while True:
+        tl = t.statuses.user_timeline(**kwargs)
+        timeline_sub(tl, timeline)
+        kwargs['max_id'] = min([tweet['id'] for tweet in tl])
+    timeline.max_id = kwargs['max_id']
+
+
 def main():
     from optparse import OptionParser
     parser = OptionParser()
     parser.add_option('-c', dest='connection_string', type="string", help='SQL connection URI such as sqlite:///full/path/to/database.db')
-    parser.add_option('-s', dest='query', type="string", help='Search query such as #foo')
+    parser.add_option('-q', dest='query', type="string", help='Archive search results such as #foo')
+    parser.add_option('-s', dest='screen_name', type="string", help='Archive timeline for given screen name')
     (options, args) = parser.parse_args()
     connection = connectionForURI(options.connection_string)
     sqlhub.processConnection = connection
     Query.createTable(ifNotExists = True)
-    Tweet.createTable(ifNotExists = True)
-    search(options.query)
+    SearchTweet.createTable(ifNotExists = True)
+    TimelineTweet.createTable(ifNotExists = True)
+    Timeline.createTable(ifNotExists = True)
+    if options.query:
+        search(options.query)
+    if options.screen_name:
+        timeline(options.screen_name)
 
 main()
