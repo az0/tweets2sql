@@ -22,7 +22,6 @@
 import os
 import time
 import twitter
-from twitter.archiver import format_date
 from sqlobject import *
 from sqlobject.dberrors import IntegrityError
 
