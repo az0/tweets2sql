@@ -163,7 +163,9 @@ def timeline(screen_name):
         tl = t.statuses.user_timeline(**kwargs)
         timeline_sub(tl, timeline)
         kwargs['max_id'] = min([tweet['id'] for tweet in tl])
-    timeline.max_id = kwargs['max_id']
+        max_id = max(max_id, max([tweet['id'] for tweet in tl]))
+    # if the search succeeded, save the most recent ID
+    timeline.max_id = max_id
 
 
 def main():
