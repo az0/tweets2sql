@@ -3,6 +3,7 @@
 
 ## twitter2sql
 ## Copyright (C) 2013 Andrew Ziem
+## https://github.com/az0/twitter2sql
 ##
 ## This program is free software: you can redistribute it and/or modify
 ## it under the terms of the GNU General Public License as published by
@@ -72,6 +73,7 @@ def search_sub(twitter_query_results, query):
             Tweet(**kwargs)
         except IntegrityError:
             print 'DEBUG: tweet already in database', tweet['id']
+
 
 def search(query_str):
     query_str = query_str.strip()
