@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 # vim: ts=4:sw=4:expandtab
 
-## twitter2sql
+## tweets2sql
 ## Copyright (C) 2013 Andrew Ziem
-## https://github.com/az0/twitter2sql
+## https://github.com/az0/tweets2sql
 ##
 ## This program is free software: you can redistribute it and/or modify
 ## it under the terms of the GNU General Public License as published by
