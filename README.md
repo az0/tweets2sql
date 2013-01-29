@@ -3,7 +3,7 @@ tweets2sql
 
 Archive Twitter tweets to a SQL database.
 
-Requires Python version 2.6 or 2.7, [sixohsix's twitter API](https://github.com/sixohsix/twitter) and [SQLObject](http://www.sqlobject.org/SQLObject.html), which supports many database types including: SQLite, MySQL, Microsoft SQL Server, and others.
+Requires Python version 2.6 or 2.7, [sixohsix's twitter API](https://github.com/sixohsix/twitter) and [SQLObject](http://www.sqlobject.org/SQLObject.html), which supports many database types including: SQLite, MySQL, and Microsoft SQL Server.
 
 Usage
 =====
