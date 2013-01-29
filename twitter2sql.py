@@ -129,7 +129,7 @@ def search(query_str):
 
 class TimelineArchiver:
     """Archive a user's timeline"""
-    def __init__(self, screen_name):
+    def __init__(self, screen_name, auth):
         self.screen_name = screen_name
         # find the most recent ID
         results = Timeline.selectBy(screen_name = screen_name)
@@ -144,7 +144,7 @@ class TimelineArchiver:
             self.max_id = Timeline.select(Timeline.q.screen_name==screen_name)[0].max_id
 
         # connection
-        self.twitter = twitter.Twitter(auth=twitter.NoAuth(), api_version='1', domain='api.twitter.com')
+        self.twitter = twitter.Twitter(auth=auth, api_version='1', domain='api.twitter.com')
 
         # stats
         self.new = 0
@@ -251,6 +251,7 @@ def main():
     parser.add_option('-c', dest='connection_string', type="string", help='SQL connection URI such as sqlite:///full/path/to/database.db')
     parser.add_option('-q', dest='query', type="string", help='Archive search results such as #foo')
     parser.add_option('-s', dest='screen_name', type="string", help='Archive timeline for given screen name')
+    parser.add_option('-o', dest='oauth', type="string", help='Authenticate using OAuth')
     (options, args) = parser.parse_args()
 
     # setup SQLObject
@@ -261,13 +262,25 @@ def main():
     TimelineTweet.createTable(ifNotExists = True)
     Timeline.createTable(ifNotExists = True)
 
+    # authenticate
+    if options.oauth:
+        creds = os.path.expanduser('~/.tweets2sql-oauth')
+        CONSUMER_KEY = 'mikYMFxbLhD1TAhaztCshA'
+        CONSUMER_SECRET = 'Ys9VHBWLS5fX4cFnDHSVac52fl388JV19yJz1WMss'
+        if not os.path.exists(creds):
+            twitter.oauth_dance("tweets2sql", CONSUMER_KEY, CONSUMER_SECRET, creds)
+        oauth_token, oauth_secret = twitter.read_token_file(creds)
+        auth = twitter.OAuth(oauth_token, oauth_secret, CONSUMER_KEY, CONSUMER_SECRET)
+    else:
+        auth = twitter.NoAuth()
+
     # process command line
     if options.query:
         print '*** SEARCH: %s' % options.query
         search(options.query)
     if options.screen_name:
         print '*** SCREEN NAME: %s' % options.screen_name
-        ta = TimelineArchiver(options.screen_name)
+        ta = TimelineArchiver(options.screen_name, auth)
         archive_loop(ta)
 
 main()
