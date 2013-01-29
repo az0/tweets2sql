@@ -81,7 +81,7 @@ def twitterdate(tdate):
     return dateutil.parser.parse(tdate)
 
 
-def SearchArchiver:
+class SearchArchiver:
     """Archive search results"""
 
     def __init__(self, query_str, auth):
@@ -90,21 +90,21 @@ def SearchArchiver:
         results = Query.selectBy(query = query_str)
         if 0 == results.count():
             # make a new query record
-            self.query = Query(query = query_str)
+            self.query_record = Query(query = query_str)
         else:
             # use existing query record
-            self.query = results[0]
+            self.query_record = results[0]
         # counter
         self.new = 0
         self.dup = 0
 
 
-    def query:
+    def query(self):
         """Make one API call and archive the results"""
         print 'SearchArchiver.query()'
         kwargs = { 'q' : self.query_str, 'rpp' : 200 }
         tquery = self.twitter.search(**kwargs)
-        for tweet in twitter_query_results:
+        for tweet in tquery['results']:
             created_at = twitterdate(tweet['created_at'])
             kwargs = { 'id' : tweet['id'], \
                 'iso_language_code' : tweet['iso_language_code'], \
@@ -117,7 +117,7 @@ def SearchArchiver:
                 'from_user_id' : tweet['from_user_id'], \
                 'from_user_name' : tweet['from_user_name'],
                 'created_at' : created_at, \
-                'query' : query }
+                'query' : self.query_record }
             try:
                 SearchTweet(**kwargs)
             except IntegrityError:
@@ -181,7 +181,6 @@ class TimelineArchiver:
 
 
 
-
 def archive(twitter, q_type, q_str):
     if q_type == Q_TIMELINE:
         return timeline(q_str, max_id)
@@ -189,7 +188,6 @@ def archive(twitter, q_type, q_str):
         return search(q_str, max_id)
     else:
         raise RuntimeError('unknown query type %d: %s' % (q_type, q_str))
-
 
 
 def archive_loop(archiver):
