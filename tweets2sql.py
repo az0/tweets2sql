@@ -81,54 +81,55 @@ def twitterdate(tdate):
     return dateutil.parser.parse(tdate)
 
 
-def search_sub(twitter_query_results, query):
-    for tweet in twitter_query_results:
-        created_at = twitterdate(tweet['created_at'])
-        kwargs = { 'id' : tweet['id'], \
-            'iso_language_code' : tweet['iso_language_code'], \
-            'text' : tweet['text'], \
-            'to_user' : tweet['to_user'], \
-            'to_user_id' : tweet['to_user_id'], \
-            'to_user_name' : tweet['to_user_name'], \
-            'source' : tweet['source'], \
-            'from_user' : tweet['from_user'], \
-            'from_user_id' : tweet['from_user_id'], \
-            'from_user_name' : tweet['from_user_name'],
-            'created_at' : created_at, \
-            'query' : query }
-        try:
-            SearchTweet(**kwargs)
-        except IntegrityError:
-            print 'DEBUG: tweet already in database', tweet['id']
+def SearchArchiver:
+    """Archive search results"""
+
+    def __init__(self, query_str, auth):
+        self.query_str = query_str.strip()
+        self.twitter = twitter.Twitter(auth = auth, domain = 'search.twitter.com')
+        results = Query.selectBy(query = query_str)
+        if 0 == results.count():
+            # make a new query record
+            self.query = Query(query = query_str)
+        else:
+            # use existing query record
+            self.query = results[0]
+        # counter
+        self.new = 0
+        self.dup = 0
 
 
-def search(query_str):
-    query_str = query_str.strip()
+    def query:
+        """Make one API call and archive the results"""
+        print 'SearchArchiver.query()'
+        kwargs = { 'q' : self.query_str, 'rpp' : 200 }
+        tquery = self.twitter.search(**kwargs)
+        for tweet in twitter_query_results:
+            created_at = twitterdate(tweet['created_at'])
+            kwargs = { 'id' : tweet['id'], \
+                'iso_language_code' : tweet['iso_language_code'], \
+                'text' : tweet['text'], \
+                'to_user' : tweet['to_user'], \
+                'to_user_id' : tweet['to_user_id'], \
+                'to_user_name' : tweet['to_user_name'], \
+                'source' : tweet['source'], \
+                'from_user' : tweet['from_user'], \
+                'from_user_id' : tweet['from_user_id'], \
+                'from_user_name' : tweet['from_user_name'],
+                'created_at' : created_at, \
+                'query' : query }
+            try:
+                SearchTweet(**kwargs)
+            except IntegrityError:
+                print 'DEBUG: tweet already in database', tweet['id']
+                self.dup += 1
+            else:
+                self.new += 1
 
-    print '**** QUERY: %s' % query_str
-
-    # find the most recent ID
-    results = Query.selectBy(query = query_str)
-    if 0 == results.count():
-        query = Query(query = query_str)
-    else:
-        query = results[0]
-
-    ts = twitter.Twitter(domain = 'search.twitter.com')
-
-    RPP = 200 # results per page
-    kwargs = { 'q' : query_str, 'rpp' : RPP }
-    while True:
-        tquery = ts.search(**kwargs)
-        search_sub(tquery['results'], query)
-        query.max_id = tquery['max_id']
-        kwargs['max_id'] = query.max_id
-        print 'DEBUG: in this batch found %d tweets' % len(tquery['results'])
-        if len(tquery['results']) < RPP:
-            break
 
 class TimelineArchiver:
     """Archive a user's timeline"""
+
     def __init__(self, screen_name, auth):
         self.screen_name = screen_name
         # find the most recent ID
@@ -277,7 +278,8 @@ def main():
     # process command line
     if options.query:
         print '*** SEARCH: %s' % options.query
-        search(options.query)
+        sa = SearchArchiver(options.query, auth)
+        archive_loop(sa)
     if options.screen_name:
         print '*** SCREEN NAME: %s' % options.screen_name
         ta = TimelineArchiver(options.screen_name, auth)
