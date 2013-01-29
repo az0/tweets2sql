@@ -29,8 +29,6 @@ import time
 import twitter
 import urllib2
 
-Q_TIMELINE = 1
-Q_SEARCH = 2
 
 class SearchTweet(SQLObject):
     """A tweet as found in the Twitter search API"""
@@ -178,16 +176,6 @@ class TimelineArchiver:
                 self.dup += 1
             else:
                 self.new += 1
-
-
-
-def archive(twitter, q_type, q_str):
-    if q_type == Q_TIMELINE:
-        return timeline(q_str, max_id)
-    elif q_type == Q_SEARCH:
-        return search(q_str, max_id)
-    else:
-        raise RuntimeError('unknown query type %d: %s' % (q_type, q_str))
 
 
 def archive_loop(archiver):
