@@ -69,7 +69,7 @@ class Timeline(SQLObject):
     """A Twitter timeline for a single user account"""
     # FIXME: user can change screen name
     screen_name = UnicodeCol(length=20, alternateID=True)
-    max_id = IntCol(default=None)
+    since_id = IntCol(default=None)
 
 
 def twitterdate(tdate):
@@ -130,17 +130,19 @@ class TimelineArchiver:
 
     def __init__(self, screen_name, auth):
         self.screen_name = screen_name
+        self.first_query = True
+        self.min_id = None
         # find the most recent ID
         results = Timeline.selectBy(screen_name = screen_name)
         if 0 == results.count():
             # make a new timeline
             self.timeline = Timeline(screen_name = screen_name)
-            self.max_id = None
+            self.since_id = None
         else:
             # use the existing timeline
             self.timeline = results[0]
             # find max ID
-            self.max_id = Timeline.select(Timeline.q.screen_name==screen_name)[0].max_id
+            self.since_id = Timeline.select(Timeline.q.screen_name==screen_name)[0].since_id
 
         # connection
         self.twitter = twitter.Twitter(auth=auth, api_version='1', domain='api.twitter.com')
@@ -152,10 +154,12 @@ class TimelineArchiver:
 
     def query(self):
         """Make one API call and archive the results"""
-        print 'TimelineArchiver.query()'
-        kwargs = { 'screen_name' : self.screen_name, 'rpp': 200 }
-        if self.max_id:
-            kwargs['max_id'] = self.max_id
+        kwargs = { 'screen_name' : self.screen_name, 'count': 200 }
+        if self.first_query and self.since_id:
+            kwargs['since_id'] = self.since_id
+        if self.min_id:
+            kwargs['max_id'] = self.min_id - 1
+        print 'TimelineArchiver.query(%s)' % kwargs
         tl = self.twitter.statuses.user_timeline(**kwargs)
         for tweet in tl:
             created_at = twitterdate(tweet['created_at'])
@@ -176,6 +180,19 @@ class TimelineArchiver:
                 self.dup += 1
             else:
                 self.new += 1
+        if not tl:
+            # no tweets
+            return
+        if self.first_query:
+            self.first_query = False
+            # for future sessions
+            self.since_id = max([tweet['id'] for tweet in tl])
+        # for this session, search backwards
+        self.min_id = min([tweet['id'] for tweet in tl])
+
+    def success(self):
+        """Call once after successfully archiving the timeline"""
+        self.timeline.since_id = self.since_id
 
 
 def archive_loop(archiver):
@@ -225,11 +242,16 @@ def archive_loop(archiver):
             fail.wait(3)
         else:
             this_new = archiver.new - last_new
-            err('Browsing.  New:%d.  Dup:%d' % (archiver.new, archiver.dup))
+            err('Browsing.  New: %d.  Dup: %d' % (archiver.new, archiver.dup))
+            # Twitter filters some bad tweets after applying the filter, so we may
+            # not receive the full count.
+            # FIXME: this heuristic may sometimes be unreliable
             if this_new < 190:
+                # It seems like there is nothing left in this timeline.
                 break
             last_new = archiver.new
             fail = Fail()
+    archiver.success()
 
 
 def main():
