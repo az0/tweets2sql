@@ -48,7 +48,7 @@ class SearchTweet(SQLObject):
 class Query(SQLObject):
     """A query for the search API"""
     query = UnicodeCol()
-    max_id = IntCol(default = None) # most recent seen
+    since_id = IntCol(default = None) # most recent seen
 
 
 class TimelineTweet(SQLObject):
@@ -79,29 +79,59 @@ def twitterdate(tdate):
     return dateutil.parser.parse(tdate)
 
 
-class SearchArchiver:
+class Archiver:
+    """Base class for archiving X from Twitter to SQL"""
+
+    def __init__(self):
+        self.first_query = True
+        self.min_id = None # for navigating backwards in this session
+        self.new = 0 # counter
+        self.dup = 0 # counter
+
+
+    def more(self):
+        """Returns boolean whether more results are available"""
+        assert(not self.first_query)
+        # FIXME: improve this heuristic method
+        # Twitter performs filters bad tweets after getting the requested
+        # number of tweets, so there may be fewer
+        return (self.rpp * 0.90) <= self.query_count
+
+    def success(self):
+        """Call once after successfully archiving the timeline"""
+        self.record.since_id = self.since_id
+
+
+class SearchArchiver(Archiver):
     """Archive search results"""
 
     def __init__(self, query_str, auth):
+        Archiver.__init__(self)
         self.query_str = query_str.strip()
-        self.twitter = twitter.Twitter(auth = auth, domain = 'search.twitter.com')
-        results = Query.selectBy(query = query_str)
+        self.rpp = 100 # Twitter 1 and 1.1 API limits to 100 results per page
+        results = Query.selectBy(query = self.query_str)
         if 0 == results.count():
             # make a new query record
-            self.query_record = Query(query = query_str)
+            self.record = Query(query = self.query_str)
+            self.since_id = None
         else:
             # use existing query record
-            self.query_record = results[0]
-        # counter
-        self.new = 0
-        self.dup = 0
+            self.record = results[0]
+            self.since_id = Query.select(Query.q.query == self.query_str)[0].since_id
 
+        # connection
+        self.twitter = twitter.Twitter(auth = auth, domain = 'search.twitter.com')
 
     def query(self):
         """Make one API call and archive the results"""
-        print 'SearchArchiver.query()'
-        kwargs = { 'q' : self.query_str, 'rpp' : 200 }
+        kwargs = { 'q' : self.query_str, 'rpp' : self.rpp }
+        if self.first_query and self.since_id:
+            kwargs['since_id'] = self.since_id
+        if self.min_id:
+            kwargs['max_id'] = self.min_id - 1
+        print 'SearchArchiver.query(%s)' % kwargs
         tquery = self.twitter.search(**kwargs)
+        found_any = False
         for tweet in tquery['results']:
             created_at = twitterdate(tweet['created_at'])
             kwargs = { 'id' : tweet['id'], \
@@ -115,7 +145,8 @@ class SearchArchiver:
                 'from_user_id' : tweet['from_user_id'], \
                 'from_user_name' : tweet['from_user_name'],
                 'created_at' : created_at, \
-                'query' : self.query_record }
+                'query' : self.record }
+            found_any = True
             try:
                 SearchTweet(**kwargs)
             except IntegrityError:
@@ -123,38 +154,44 @@ class SearchArchiver:
                 self.dup += 1
             else:
                 self.new += 1
+        if not found_any:
+            self.query_count = 0
+            self.first_query = False
+            return
+        self.query_count = len(tquery['results'])
+        if self.first_query:
+            self.first_query = False
+            self.since_id = max([tweet['id'] for tweet in tquery['results']])
+        self.min_id = min([tweet['id'] for tweet in tquery['results']])
 
 
-class TimelineArchiver:
+
+class TimelineArchiver(Archiver):
     """Archive a user's timeline"""
 
     def __init__(self, screen_name, auth):
+        Archiver.__init__(self)
         self.screen_name = screen_name
-        self.first_query = True
-        self.min_id = None
+        self.rpp = 200 # called count in this API
         # find the most recent ID
         results = Timeline.selectBy(screen_name = screen_name)
         if 0 == results.count():
             # make a new timeline
-            self.timeline = Timeline(screen_name = screen_name)
+            self.record = Timeline(screen_name = screen_name)
             self.since_id = None
         else:
             # use the existing timeline
-            self.timeline = results[0]
+            self.record = results[0]
             # find max ID
             self.since_id = Timeline.select(Timeline.q.screen_name==screen_name)[0].since_id
 
         # connection
         self.twitter = twitter.Twitter(auth=auth, api_version='1', domain='api.twitter.com')
 
-        # stats
-        self.new = 0
-        self.dup = 0
-
 
     def query(self):
         """Make one API call and archive the results"""
-        kwargs = { 'screen_name' : self.screen_name, 'count': 200 }
+        kwargs = { 'screen_name' : self.screen_name, 'count': self.rpp }
         if self.first_query and self.since_id:
             kwargs['since_id'] = self.since_id
         if self.min_id:
@@ -172,7 +209,7 @@ class TimelineArchiver:
                 'text' : tweet['text'], \
                 'source' : tweet['source'], \
                 'created_at' : created_at, \
-                'timeline' : self.timeline }
+                'timeline' : self.record }
             try:
                 TimelineTweet(**kwargs)
             except IntegrityError:
@@ -182,17 +219,16 @@ class TimelineArchiver:
                 self.new += 1
         if not tl:
             # no tweets
+            self.query_count = 0
+            self.first_query = False
             return
+        self.query_count = len(tl)
         if self.first_query:
             self.first_query = False
             # for future sessions
             self.since_id = max([tweet['id'] for tweet in tl])
         # for this session, search backwards
         self.min_id = min([tweet['id'] for tweet in tl])
-
-    def success(self):
-        """Call once after successfully archiving the timeline"""
-        self.timeline.since_id = self.since_id
 
 
 def archive_loop(archiver):
@@ -242,16 +278,13 @@ def archive_loop(archiver):
             fail.wait(3)
         else:
             this_new = archiver.new - last_new
-            err('Browsing.  New: %d.  Dup: %d' % (archiver.new, archiver.dup))
-            # Twitter filters some bad tweets after applying the filter, so we may
-            # not receive the full count.
-            # FIXME: this heuristic may sometimes be unreliable
-            if this_new < 190:
-                # It seems like there is nothing left in this timeline.
+            err('Browsing.  This batch: %d.  Cumulative new: %d.  Cumulative duplicate: %d' \
+                % (archiver.query_count, archiver.new, archiver.dup))
+            if not archiver.more():
+                archiver.success()
                 break
             last_new = archiver.new
             fail = Fail()
-    archiver.success()
 
 
 def main():
