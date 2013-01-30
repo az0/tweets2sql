@@ -99,6 +99,13 @@ class Archiver:
         return (self.rpp * 0.90) <= self.query_count
 
 
+    def rate_limit_status(self):
+        """Query the rate limit status"""
+        r = self.twitter_search.application.rate_limit_status()
+        sr = r['resources']['%s' % self.resource]['/%s/%s' % (self.resource, self.sub_resource)]
+        return (sr['reset'], sr['limit'])
+
+
     def success(self):
         """Call once after successfully archiving the timeline"""
         self.record.since_id = self.since_id
@@ -111,6 +118,8 @@ class SearchArchiver(Archiver):
         Archiver.__init__(self, twitter_search)
         self.query_str = query_str.strip()
         self.rpp = 100 # Twitter 1 and 1.1 API limits to 100 results per page
+        self.resource = 'search'
+        self.sub_resource = 'tweets'
         results = Search.selectBy(query = self.query_str)
         if 0 == results.count():
             # make a new query record
@@ -174,6 +183,8 @@ class TimelineArchiver(Archiver):
         Archiver.__init__(self, twitter_search)
         self.screen_name = screen_name
         self.rpp = 200 # called count in this API
+        self.resource = 'statuses'
+        self.sub_resource = 'user_timeline'
         # find the most recent ID
         results = Timeline.selectBy(screen_name = screen_name)
         if 0 == results.count():
@@ -246,14 +257,11 @@ def archive_loop(archiver):
                 break
             elif e.e.code == 400:
                 err("Fail: %i API rate limit exceeded" % e.e.code)
-                rate = twitter.account.rate_limit_status()
-                reset = rate['reset_time_in_seconds']
-                reset = time.asctime(time.localtime(reset))
-                delay = int(rate['reset_time_in_seconds']
-                            - time.time()) + 5 # avoid race
-                err("Hourly limit of %i requests reached, next reset on %s: "
-                    "going to sleep for %i secs" % (rate['hourly_limit'],
-                                                    reset, delay))
+                (reset_unix, limit) = archiver.rate_limit_status()
+                reset_str = time.asctime(time.localtime(reset_unix))
+                delay = int(reset_unix - time.time()) + 5 # avoid race
+                err("Limit of %i requests reached, next reset on %s: "
+                    "going to sleep for %i secs" % (limit, reset_str, delay))
                 fail.wait(delay)
                 continue
             elif e.e.code == 404:
