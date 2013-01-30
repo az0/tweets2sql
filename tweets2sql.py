@@ -42,10 +42,10 @@ class SearchTweet(SQLObject):
     iso_language_code = StringCol(length=5) # examples: en, es, fil, zh-tw
     source = UnicodeCol()
     created_at = DateTimeCol()
-    query = ForeignKey('Query')
+    search = ForeignKey('Search')
 
 
-class Query(SQLObject):
+class Search(SQLObject):
     """A query for the search API"""
     query = UnicodeCol()
     since_id = IntCol(default = None) # most recent seen
@@ -109,15 +109,15 @@ class SearchArchiver(Archiver):
         Archiver.__init__(self)
         self.query_str = query_str.strip()
         self.rpp = 100 # Twitter 1 and 1.1 API limits to 100 results per page
-        results = Query.selectBy(query = self.query_str)
+        results = Search.selectBy(query = self.query_str)
         if 0 == results.count():
             # make a new query record
-            self.record = Query(query = self.query_str)
+            self.record = Search(query = self.query_str)
             self.since_id = None
         else:
             # use existing query record
             self.record = results[0]
-            self.since_id = Query.select(Query.q.query == self.query_str)[0].since_id
+            self.since_id = Search.select(Search.q.query == self.query_str)[0].since_id
 
         # connection
         self.twitter = twitter.Twitter(auth = auth, domain = 'search.twitter.com')
@@ -145,7 +145,7 @@ class SearchArchiver(Archiver):
                 'from_user_id' : tweet['from_user_id'], \
                 'from_user_name' : tweet['from_user_name'],
                 'created_at' : created_at, \
-                'query' : self.record }
+                'search' : self.record }
             found_any = True
             try:
                 SearchTweet(**kwargs)
@@ -299,7 +299,7 @@ def main():
     # setup SQLObject
     connection = connectionForURI(options.connection_string)
     sqlhub.processConnection = connection
-    Query.createTable(ifNotExists = True)
+    Search.createTable(ifNotExists = True)
     SearchTweet.createTable(ifNotExists = True)
     TimelineTweet.createTable(ifNotExists = True)
     Timeline.createTable(ifNotExists = True)
