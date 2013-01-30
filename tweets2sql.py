@@ -42,7 +42,6 @@ class SearchTweet11(SQLObject):
     text = UnicodeCol(length=140)
     user_id = IntCol()
     user_screen_name = UnicodeCol(length=20)
-    # FIXME coordinates
     search = ForeignKey('Search')
 
 
