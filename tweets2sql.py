@@ -256,7 +256,13 @@ def archive_loop(archiver):
                     % e.e.code)
                 break
             elif e.e.code == 400:
-                err("Fail: %i API rate limit exceeded" % e.e.code)
+                err("Fail: %i Bad Request" % e.e.code)
+                break
+            elif e.e.code == 404:
+                err("Fail: %i Profile does not exist" % e.e.code)
+                break
+            elif e.e.code == 429:
+                err("Fail: %i Too Many Requests" % e.e.code)
                 (reset_unix, limit) = archiver.rate_limit_status()
                 reset_str = time.asctime(time.localtime(reset_unix))
                 delay = int(reset_unix - time.time()) + 5 # avoid race
@@ -264,9 +270,6 @@ def archive_loop(archiver):
                     "going to sleep for %i secs" % (limit, reset_str, delay))
                 fail.wait(delay)
                 continue
-            elif e.e.code == 404:
-                err("Fail: %i Profile does not exist" % e.e.code)
-                break
             elif e.e.code == 502:
                 err("Fail: %i Service currently unavailable, retrying..."
                     % e.e.code)
@@ -299,7 +302,6 @@ def main():
     parser.add_option('-c', dest='connection_string', type="string", help='SQL connection URI such as sqlite:///full/path/to/database.db')
     parser.add_option('-q', dest='query', type="string", help='Archive search results such as #foo')
     parser.add_option('-s', dest='screen_name', type="string", help='Archive timeline for given screen name')
-    parser.add_option('-o', dest='oauth', type="string", help='Authenticate using OAuth')
     (options, args) = parser.parse_args()
 
     # setup SQLObject
@@ -311,16 +313,13 @@ def main():
     Timeline.createTable(ifNotExists = True)
 
     # authenticate
-    if options.oauth:
-        creds = os.path.expanduser('~/.tweets2sql-oauth')
-        CONSUMER_KEY = 'mikYMFxbLhD1TAhaztCshA'
-        CONSUMER_SECRET = 'Ys9VHBWLS5fX4cFnDHSVac52fl388JV19yJz1WMss'
-        if not os.path.exists(creds):
-            twitter.oauth_dance("tweets2sql", CONSUMER_KEY, CONSUMER_SECRET, creds)
-        oauth_token, oauth_secret = twitter.read_token_file(creds)
-        auth = twitter.OAuth(oauth_token, oauth_secret, CONSUMER_KEY, CONSUMER_SECRET)
-    else:
-        auth = twitter.NoAuth()
+    creds = os.path.expanduser('~/.tweets2sql-oauth')
+    CONSUMER_KEY = 'mikYMFxbLhD1TAhaztCshA'
+    CONSUMER_SECRET = 'Ys9VHBWLS5fX4cFnDHSVac52fl388JV19yJz1WMss'
+    if not os.path.exists(creds):
+        twitter.oauth_dance("tweets2sql", CONSUMER_KEY, CONSUMER_SECRET, creds)
+    oauth_token, oauth_secret = twitter.read_token_file(creds)
+    auth = twitter.OAuth(oauth_token, oauth_secret, CONSUMER_KEY, CONSUMER_SECRET)
 
     # connect
     twitter_search = twitter.Twitter(domain='api.twitter.com', auth=auth, api_version = '1.1')
