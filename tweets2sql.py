@@ -336,8 +336,9 @@ def main():
         sa = SearchArchiver(options.search, twitter_search)
         archive_loop(sa)
     if options.user:
-        print '*** Archiving user timelime: %s' % options.user
-        ta = TimelineArchiver(options.user, twitter_search)
-        archive_loop(ta)
+        for user in options.user.split(','):
+            print '*** Archiving user timelime: %s' % user
+            ta = TimelineArchiver(user, twitter_search)
+            archive_loop(ta)
 
 main()

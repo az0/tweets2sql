@@ -19,6 +19,7 @@ These examples are for Linux and SQLite:
     # Archive nprnews timeline
     python tweets2sql.py -c sqlite:///home/username/twitter.db -u nprnews
 
-This example is for Windows and Microsoft SQL Server:
+This example is for Windows and Microsoft SQL Server.  Notice multiple user
+cames can be passed delimited by a comma.
 
-    tweets2sql.py -c mssql://user:pass/db -u nprnews
+    tweets2sql.py -c mssql://user:pass/db -u nprnews,npr
