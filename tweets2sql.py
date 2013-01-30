@@ -19,7 +19,8 @@
 ## along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-from sqlobject import *
+from sqlobject import SQLObject, DateTimeCol, StringCol, UnicodeCol, IntCol, \
+    ForeignKey, connectionForURI, sqlhub
 from sqlobject.dberrors import IntegrityError
 from twitter.api import TwitterError
 from twitter.util import Fail, err
