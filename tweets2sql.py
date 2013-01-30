@@ -299,10 +299,16 @@ def archive_loop(archiver):
 def main():
     from optparse import OptionParser
     parser = OptionParser()
-    parser.add_option('-c', dest='connection_string', type="string", help='SQL connection URI such as sqlite:///full/path/to/database.db')
-    parser.add_option('-q', dest='query', type="string", help='Archive search results such as #foo')
-    parser.add_option('-s', dest='screen_name', type="string", help='Archive timeline for given screen name')
+    parser.add_option('-c', '--connnection', dest='connection_string', type='string', help='SQL connection URI such as sqlite:///full/path/to/database.db')
+    parser.add_option('-s', '--search', dest='search', type='string', help='Archive search results such as #foo')
+    parser.add_option('-u', '--user', dest='user', type='string', help='Archive user timeline')
     (options, args) = parser.parse_args()
+
+    if not options.connection_string:
+        parser.print_usage()
+        print 'Try the --help option'
+        import sys
+        sys.exit(1)
 
     # setup SQLObject
     connection = connectionForURI(options.connection_string)
@@ -325,13 +331,13 @@ def main():
     twitter_search = twitter.Twitter(domain='api.twitter.com', auth=auth, api_version = '1.1')
 
     # process command line
-    if options.query:
-        print '*** SEARCH: %s' % options.query
-        sa = SearchArchiver(options.query, twitter_search)
+    if options.search:
+        print '*** Archiving search: %s' % options.search
+        sa = SearchArchiver(options.search, twitter_search)
         archive_loop(sa)
-    if options.screen_name:
-        print '*** SCREEN NAME: %s' % options.screen_name
-        ta = TimelineArchiver(options.screen_name, twitter_search)
+    if options.user:
+        print '*** Archiving user timelime: %s' % options.user
+        ta = TimelineArchiver(options.user, twitter_search)
         archive_loop(ta)
 
 main()
