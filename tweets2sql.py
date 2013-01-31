@@ -313,10 +313,13 @@ def main():
     # setup SQLObject
     connection = connectionForURI(options.connection_string)
     sqlhub.processConnection = connection
+
+    # When creating tables, make sure to start with those referenced as
+    # foreign keys.
     Search.createTable(ifNotExists = True)
     SearchTweet11.createTable(ifNotExists = True)
-    TimelineTweet.createTable(ifNotExists = True)
     Timeline.createTable(ifNotExists = True)
+    TimelineTweet.createTable(ifNotExists = True)
 
     # authenticate
     creds = os.path.expanduser('~/.tweets2sql-oauth')
