@@ -20,8 +20,7 @@
 
 
 from sqlobject import SQLObject, DateTimeCol, StringCol, UnicodeCol, IntCol, \
-    ForeignKey, connectionForURI, sqlhub
-from sqlobject.dberrors import IntegrityError
+    ForeignKey, connectionForURI, sqlhub, SQLObjectNotFound
 from twitter.api import TwitterError
 from twitter.util import Fail, err
 import httplib
@@ -159,12 +158,13 @@ class SearchArchiver(Archiver):
                 'search' : self.record }
             found_any = True
             try:
+                SearchTweet11.get(tweet['id'])
+            except SQLObjectNotFound:
                 SearchTweet11(**kwargs)
-            except IntegrityError:
+                self.new += 1
+            else:
                 print 'DEBUG: tweet already in database', tweet['id']
                 self.dup += 1
-            else:
-                self.new += 1
         if not found_any:
             self.query_count = 0
             self.first_query = False
@@ -221,12 +221,13 @@ class TimelineArchiver(Archiver):
                 'created_at' : created_at, \
                 'timeline' : self.record }
             try:
+                TimelineTweet.get(tweet['id'])
+            except SQLObjectNotFound:
                 TimelineTweet(**kwargs)
-            except IntegrityError:
+                self.new += 1
+            else:
                 print 'DEBUG: tweet already in database', tweet['id']
                 self.dup += 1
-            else:
-                self.new += 1
         if not tl:
             # no tweets
             self.query_count = 0
