@@ -296,6 +296,34 @@ def archive_loop(archiver):
             fail = Fail()
 
 
+def connect_sql(connection_string):
+    """Initialize SQL connection and database"""
+    connection = connectionForURI(connection_string)
+    sqlhub.processConnection = connection
+
+    # When creating tables, make sure to start with those referenced as
+    # foreign keys.
+    Search.createTable(ifNotExists = True)
+    SearchTweet11.createTable(ifNotExists = True)
+    Timeline.createTable(ifNotExists = True)
+    TimelineTweet.createTable(ifNotExists = True)
+
+
+def connect_twitter():
+    """Initialize connection to Twitter"""
+    # authenticate
+    creds = os.path.expanduser('~/.tweets2sql-oauth')
+    CONSUMER_KEY = 'mikYMFxbLhD1TAhaztCshA'
+    CONSUMER_SECRET = 'Ys9VHBWLS5fX4cFnDHSVac52fl388JV19yJz1WMss'
+    if not os.path.exists(creds):
+        twitter.oauth_dance("tweets2sql", CONSUMER_KEY, CONSUMER_SECRET, creds)
+    oauth_token, oauth_secret = twitter.read_token_file(creds)
+    auth = twitter.OAuth(oauth_token, oauth_secret, CONSUMER_KEY, CONSUMER_SECRET)
+
+    # connect
+    return twitter.Twitter(domain='api.twitter.com', auth=auth, api_version = '1.1')
+
+
 def main():
     from optparse import OptionParser
     parser = OptionParser()
@@ -310,28 +338,8 @@ def main():
         import sys
         sys.exit(1)
 
-    # setup SQLObject
-    connection = connectionForURI(options.connection_string)
-    sqlhub.processConnection = connection
-
-    # When creating tables, make sure to start with those referenced as
-    # foreign keys.
-    Search.createTable(ifNotExists = True)
-    SearchTweet11.createTable(ifNotExists = True)
-    Timeline.createTable(ifNotExists = True)
-    TimelineTweet.createTable(ifNotExists = True)
-
-    # authenticate
-    creds = os.path.expanduser('~/.tweets2sql-oauth')
-    CONSUMER_KEY = 'mikYMFxbLhD1TAhaztCshA'
-    CONSUMER_SECRET = 'Ys9VHBWLS5fX4cFnDHSVac52fl388JV19yJz1WMss'
-    if not os.path.exists(creds):
-        twitter.oauth_dance("tweets2sql", CONSUMER_KEY, CONSUMER_SECRET, creds)
-    oauth_token, oauth_secret = twitter.read_token_file(creds)
-    auth = twitter.OAuth(oauth_token, oauth_secret, CONSUMER_KEY, CONSUMER_SECRET)
-
-    # connect
-    twitter_search = twitter.Twitter(domain='api.twitter.com', auth=auth, api_version = '1.1')
+    connect_sql(options.connection_string)
+    twitter_search = connect_twitter()
 
     # process command line
     if options.search:
