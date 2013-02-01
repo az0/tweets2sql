@@ -40,7 +40,7 @@ class SearchTweet11(SQLObject):
     in_reply_to_user_id = IntCol(default=None)
     iso_language_code = StringCol(length=5) # examples: en, es, fil, zh-tw
     source = UnicodeCol()
-    text = UnicodeCol(length=140)
+    text = UnicodeCol()
     user_id = IntCol()
     user_screen_name = UnicodeCol(length=20)
     search = ForeignKey('Search')
@@ -58,7 +58,7 @@ class TimelineTweet(SQLObject):
     user_id = IntCol()
     user_screen_name = UnicodeCol(length=20)
     created_at = DateTimeCol()
-    text = UnicodeCol(length=140)
+    text = UnicodeCol()
     source = UnicodeCol()
     in_reply_to_status_id = IntCol(default=None)
     in_reply_to_user_id = IntCol(default=None)
