@@ -26,6 +26,7 @@ from twitter.api import TwitterError
 from twitter.util import Fail, err
 import httplib
 import os
+import sys
 import time
 import twitter
 import urllib2
@@ -309,6 +310,15 @@ def connect_sql(connection_string):
     TimelineTweet.createTable(ifNotExists = True)
 
 
+def print_sql():
+    """Print SQL commands to create tables"""
+    sql = Search.createTableSQL() + \
+        SearchTweet11.createTableSQL() + \
+        Timeline.createTableSQL() + \
+        TimelineTweet.createTableSQL()
+    sys.stdout.write('\n'.join(sql[0::2]))
+
+
 def connect_twitter():
     """Initialize connection to Twitter"""
     # authenticate
@@ -330,15 +340,20 @@ def main():
     parser.add_option('-c', '--connnection', dest='connection_string', type='string', help='SQL connection URI such as sqlite:///full/path/to/database.db')
     parser.add_option('-s', '--search', dest='search', type='string', help='Archive search results such as #foo')
     parser.add_option('-u', '--user', dest='user', type='string', help='Archive user timeline')
+    parser.add_option('--sql', action='store_true', help='Print backend-specific SQL commands to create database tables')
     (options, args) = parser.parse_args()
 
     if not options.connection_string:
         parser.print_usage()
         print 'Try the --help option'
-        import sys
         sys.exit(1)
 
     connect_sql(options.connection_string)
+
+    if options.sql:
+        print_sql()
+        sys.exit(0)
+
     twitter_search = connect_twitter()
 
     # process command line
