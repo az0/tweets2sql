@@ -133,7 +133,7 @@ class SearchArchiver(Archiver):
 
     def query(self):
         """Make one API call and archive the results"""
-        kwargs = { 'q' : self.query_str, 'rpp' : self.rpp, \
+        kwargs = { 'q' : self.query_str, 'count' : self.rpp, \
             'contributor_details': 'true' }
         if self.first_query and self.since_id:
             kwargs['since_id'] = self.since_id
