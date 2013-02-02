@@ -367,5 +367,6 @@ def main():
             print '*** Archiving user timelime: %s' % user
             ta = TimelineArchiver(user, twitter_search)
             archive_loop(ta)
+            print ''
 
 main()
