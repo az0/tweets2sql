@@ -20,7 +20,7 @@
 
 
 from sqlobject import SQLObject, DateTimeCol, StringCol, UnicodeCol, IntCol, \
-    ForeignKey, connectionForURI, sqlhub, SQLObjectNotFound
+    ForeignKey, connectionForURI, sqlhub, SQLObjectNotFound, LIKE, func
 from twitter.api import TwitterError
 from twitter.util import Fail, err
 import httplib
@@ -187,7 +187,8 @@ class TimelineArchiver(Archiver):
         self.resource = 'statuses'
         self.sub_resource = 'user_timeline'
         # find the most recent ID
-        results = Timeline.selectBy(screen_name = screen_name)
+        # Though we record the original case, the search is case insensitive.
+        results = Timeline.select(LIKE(func.lower(Timeline.q.screen_name), screen_name.lower()))
         if 0 == results.count():
             # make a new timeline
             self.record = Timeline(screen_name = screen_name)
@@ -196,7 +197,7 @@ class TimelineArchiver(Archiver):
             # use the existing timeline
             self.record = results[0]
             # find max ID
-            self.since_id = Timeline.select(Timeline.q.screen_name==screen_name)[0].since_id
+            self.since_id = self.record.since_id
 
 
     def query(self):
