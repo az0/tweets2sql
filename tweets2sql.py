@@ -370,4 +370,5 @@ def main():
             archive_loop(ta)
             print ''
 
-main()
+if __name__ == '__main__':
+    main()

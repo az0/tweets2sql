@@ -19,16 +19,44 @@
 ## along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 """
-Test tweets2sql using py.test <http://pytest.org/>
+Test tweets2sql using pytest <http://pytest.org/>
 """
+
 
 from tweets2sql import *
 import os
+import pytest
 
-def test_timeline(tmpdir):
-    """Test archiving timeline"""
+
+@pytest.fixture()
+def connection(tmpdir):
     tmpfile = tmpdir.join('archive.sqlite')
     connect_sql("sqlite:///%s" % tmpfile)
+
+
+def test_TimelineTweet(connection):
+    """Test TimelineTweet with mock data"""
+    tl = Timeline(screen_name='test_user')
+
+    # insert mock data
+    tdate = twitterdate("Wed Aug 29 17:12:58 +0000 2012")
+    text = u'\ucef4\ud328'
+    tid = 240859602684612608
+    tlt = TimelineTweet(id=tid, user_id=161651238,
+        user_screen_name='test',
+        text=text, created_at=tdate,
+        source='Twitter', timeline=tl)
+    assert(tlt.id == tid)
+
+    # retrieve it
+    tlt2 = TimelineTweet.get(tid)
+
+    # compare
+    assert(text == tlt.text)
+
+
+def test_TimelineArchiver(connection):
+    """Test TimelineArchiver with Twitter connection"""
     twitter_search = connect_twitter()
     ta = TimelineArchiver('bleachbit', twitter_search)
     archive_loop(ta)
